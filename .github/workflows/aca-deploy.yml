@@ -30,6 +30,6 @@ jobs:
       - name: Deploy to Azure Container Apps
         run: |
           az containerapp update \
-            --name flask-app \
+            --name flaskapp \
             --resource-group flaskdemo \
             --image mycontainerregistryflask.azurecr.io/flaskapp:${{ github.sha }}
