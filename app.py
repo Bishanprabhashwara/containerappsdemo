@@ -23,7 +23,7 @@ r = redis.Redis(
 
 @app.route('/')
 def index():
-    return "Hello! Use POST /set to set a value and GET /get to retrieve it."
+    return "Hello! Use POST /set to set a value and GET /get to retrieve it........"
 
 @app.route('/set', methods=['POST'])
 def set_cache():
