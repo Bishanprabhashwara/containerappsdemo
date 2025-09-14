@@ -31,5 +31,5 @@ jobs:
         run: |
           az containerapp update \
             --name flaskapp \
-            --resource-group flaskdemo \
+            --resource-group myContainerRegistry \
             --image mycontainerregistryflask.azurecr.io/flaskapp:${{ github.sha }}
