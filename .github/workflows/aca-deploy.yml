@@ -22,14 +22,29 @@ jobs:
         run: |
           az acr login --name mycontainerregistryflask
 
+      - name: Determine image version
+        id: version
+        shell: bash
+        run: |
+          if [ -f VERSION ]; then
+            VERSION=$(tr -d ' \n' < VERSION)
+          elif [[ "${GITHUB_REF_TYPE}" == "tag" ]]; then
+            VERSION="${GITHUB_REF_NAME#v}"
+          else
+            VERSION="1.0.${GITHUB_RUN_NUMBER}"
+          fi
+          echo "Using version: $VERSION"
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "IMAGE_TAG=mycontainerregistryflask.azurecr.io/flaskapp:$VERSION" >> $GITHUB_ENV
+
       - name: Build and push Docker image
         run: |
-          docker build -t mycontainerregistryflask.azurecr.io/flaskapp:${{ github.sha }} .
-          docker push mycontainerregistryflask.azurecr.io/flaskapp:${{ github.sha }}
+          docker build -t "$IMAGE_TAG" .
+          docker push "$IMAGE_TAG"
 
       - name: Deploy to Azure Container Apps
         run: |
           az containerapp update \
             --name flaskapp \
             --resource-group myContainerRegistry \
-            --image mycontainerregistryflask.azurecr.io/flaskapp:${{ github.sha }}
+            --image "$IMAGE_TAG"
