@@ -1,0 +1,81 @@
+name: Build and Deploy to Azure Container Apps
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+# Configure these as repository Variables/Secrets in GitHub Settings > Secrets and variables > Actions
+# Variables (Repository or Environment variables):
+#   ACR_NAME:           The Azure Container Registry name (e.g., myregistry)
+#   ACR_LOGIN_SERVER:   The login server (e.g., myregistry.azurecr.io)
+#   RESOURCE_GROUP:     The resource group that contains ACA + ACR
+#   CONTAINERAPPS_ENV:  The Azure Container Apps environment name
+#   CONTAINER_APP_NAME: The Azure Container App name
+#   SUBSCRIPTION_ID:    Your Azure subscription ID
+# Secrets:
+#   AZURE_CREDENTIALS:  JSON from `az ad sp create-for-rbac --name <NAME> --role contributor --scopes /subscriptions/<SUBSCRIPTION_ID> --sdk-auth`
+#   REDIS_HOST:         Redis hostname (e.g., <name>.redis.cache.windows.net or a container name)
+#   REDIS_PORT:         Redis port (e.g., 6379)
+#   REDIS_DB:           Redis DB index (e.g., 0)
+#   REDIS_PASSWORD:     Redis password (if needed). Leave empty if unauthenticated
+
+env:
+  IMAGE_NAME: ${{ github.repository }}
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write       # required for azure/login OIDC
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Azure Login (OIDC)
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID || '' }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID || '' }}
+          subscription-id: ${{ vars.SUBSCRIPTION_ID }}
+          # Alternatively use a single JSON secret (comment the 3 lines above and uncomment below):
+          # creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      - name: Azure CLI version
+        run: az version
+
+      - name: ACR Login
+        run: |
+          az acr login --name ${{ vars.ACR_NAME }}
+
+      - name: Build and Push Image
+        env:
+          REGISTRY: ${{ vars.ACR_LOGIN_SERVER }}
+        run: |
+          IMAGE_TAG_SHA="$REGISTRY/${{ env.IMAGE_NAME }}:${{ github.sha }}"
+          IMAGE_TAG_LATEST="$REGISTRY/${{ env.IMAGE_NAME }}:latest"
+          echo "Building $IMAGE_TAG_SHA"
+          docker build -t "$IMAGE_TAG_SHA" -t "$IMAGE_TAG_LATEST" .
+          docker push "$IMAGE_TAG_SHA"
+          docker push "$IMAGE_TAG_LATEST"
+          echo "image_sha=$IMAGE_TAG_SHA" >> $GITHUB_OUTPUT
+        id: build
+
+      - name: Deploy to Azure Container Apps
+        uses: azure/container-apps-deploy-action@v2
+        with:
+          resourceGroup: ${{ vars.RESOURCE_GROUP }}
+          containerAppName: ${{ vars.CONTAINER_APP_NAME }}
+          containerAppEnvironment: ${{ vars.CONTAINERAPPS_ENV }}
+          imageToDeploy: ${{ steps.build.outputs.image_sha }}
+          registryUrl: ${{ vars.ACR_LOGIN_SERVER }}
+          targetPort: 5000
+          ingress: external
+          # Set/override environment variables for the container app
+          envVars: |
+            PORT=5000
+            REDIS_HOST=${{ secrets.REDIS_HOST }}
+            REDIS_PORT=${{ secrets.REDIS_PORT || '6379' }}
+            REDIS_DB=${{ secrets.REDIS_DB || '0' }}
+            REDIS_PASSWORD=${{ secrets.REDIS_PASSWORD || '' }}

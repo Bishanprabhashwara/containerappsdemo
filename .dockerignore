@@ -1,0 +1,29 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Environments
+venv/
+.env
+.env.*
+
+# Git
+.git/
+.gitignore
+
+# OS / Editor
+.DS_Store
+*.swp
+*.swo
+.vscode/
+.idea/
+
+# Docker
+Dockerfile*
+!Dockerfile
+
+# Others
+*.log
+node_modules/
